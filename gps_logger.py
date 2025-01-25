@@ -3,6 +3,8 @@ import json
 import csv
 import gzip
 import time
+import signal
+import sys
 from datetime import datetime
 from math import radians, cos, sin, sqrt, atan2
 from rich.console import Console
@@ -14,15 +16,17 @@ GPSD_HOST = "127.0.0.1"
 GPSD_PORT = 2947
 
 # Configurazione logger
-# 130km/h = 36.11 m/s
+# 130 km/h = 36.1 m/s
 SPEED_LIMIT = 36.1  # Velocità limite (m/s)
-# Magazzino = 42.7676099, 11.1161537
+# Magazzino: 42.7676 11.1161
 GEOFENCE_CENTER = (42.7676, 11.1161)  # Centro geofence (latitudine, longitudine)
 GEOFENCE_RADIUS = 2000  # Raggio geofence in metri
 LOG_FILENAME = f"gps_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 ALERT_LOG_FILENAME = "gps_alerts.log"
 
-# Console Rich per TUI
+# Variabili globali
+gpx_points = []
+stop_flag = False  # Indica se lo script deve fermarsi in modo ordinato
 console = Console()
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -50,7 +54,7 @@ def save_to_csv(writer, data):
     """Salva i dati nel file CSV."""
     writer.writerow(data)
 
-def save_to_gpx(gpx_points):
+def save_to_gpx():
     """Salva i dati in formato GPX."""
     import gpxpy
     import gpxpy.gpx
@@ -66,8 +70,18 @@ def save_to_gpx(gpx_points):
             gpxpy.gpx.GPXTrackPoint(point['lat'], point['lon'], elevation=point.get('alt', 0))
         )
 
-    with open(LOG_FILENAME.replace(".csv", ".gpx"), "w") as gpx_file:
+    gpx_filename = LOG_FILENAME.replace(".csv", ".gpx")
+    with open(gpx_filename, "w") as gpx_file:
         gpx_file.write(gpx.to_xml())
+    console.log(f"GPX salvato in {gpx_filename}")
+
+def compress_log_file():
+    """Comprimi il file CSV per risparmiare spazio."""
+    compressed_filename = LOG_FILENAME + ".gz"
+    with open(LOG_FILENAME, "rb") as f_in:
+        with gzip.open(compressed_filename, "wb") as f_out:
+            f_out.writelines(f_in)
+    console.log(f"Log compresso salvato in {compressed_filename}")
 
 def log_alert(message):
     """Registra avvisi in un file separato."""
@@ -86,16 +100,22 @@ def display_live_data(lat, lon, alt, speed, in_geofence):
     console.clear()
     console.print(table)
 
+def handle_signal(sig, frame):
+    """Gestisce i segnali di terminazione."""
+    global stop_flag
+    stop_flag = True
+    console.log("\nSegnale ricevuto. Terminazione in corso...")
+
 def main():
-    gpx_points = []
+    global stop_flag
     with open(LOG_FILENAME, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Timestamp", "Latitude", "Longitude", "Altitude", "Speed", "Climb"])
         console.log(f"Salvando i dati in {LOG_FILENAME}...")
-        
+
         try:
             with Live(console=console, refresh_per_second=1):
-                while True:
+                while not stop_flag:
                     gps_data = get_gps_data()
                     for packet in gps_data:
                         if packet.get('class') == 'TPV':
@@ -121,11 +141,16 @@ def main():
                                 log_alert("❌ Uscito dall'area geografica")
                     time.sleep(1)
         except KeyboardInterrupt:
-            console.log("Logger interrotto. Salvando GPX...")
-            save_to_gpx(gpx_points)
-            console.log("GPX salvato con successo.")
+            stop_flag = True
+        finally:
+            console.log("Finalizzazione in corso...")
+            save_to_gpx()
+            compress_log_file()
+            console.log("Script terminato con successo.")
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handle_signal)  # Intercetta Ctrl+C
+    signal.signal(signal.SIGTERM, handle_signal)  # Intercetta shutdown/reboot
     time.sleep(5)  # Ritardo per inizializzare il GPS
     main()
 
