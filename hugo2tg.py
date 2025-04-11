@@ -5,7 +5,7 @@ import os
 import subprocess
 
 # Inserisci qui il token del tuo bot (ottenuto tramite BotFather)
-TOKEN = "7572618623:AAHsb5JT_IBQ6lpHxdAGjuax76xGyM6EpC4"
+TOKEN = ""
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}/"
 
 # URL base del blog: modifica questo valore con il tuo dominio reale
