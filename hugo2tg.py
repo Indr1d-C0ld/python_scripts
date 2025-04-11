@@ -5,8 +5,15 @@ import os
 import subprocess
 
 # Inserisci qui il token del tuo bot (ottenuto tramite BotFather)
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
+TOKEN = "7572618623:AAHsb5JT_IBQ6lpHxdAGjuax76xGyM6EpC4"
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}/"
+
+# URL base del blog: modifica questo valore con il tuo dominio reale
+BLOG_BASE_URL = "https://timrouter.dns.army/blog/"
+
+# ID del canale Telegram dove postare il link del nuovo post
+# Nota: per postare su un canale, il bot deve essere admin del canale.
+REPOST_CHANNEL_ID = -1002363443306  # Modifica con l'ID del canale
 
 def get_updates(offset=None, timeout=30):
     url = BASE_URL + "getUpdates"
@@ -83,8 +90,14 @@ def process_message(message):
             env["POST_KEYWORDS"] = data["keywords"]
             env["POST_BODY"] = data["body"]
             try:
-                subprocess.run(["/home/pi/blog/scripts/newpost.sh"], env=env, check=True)
+                subprocess.run(["/home/pi/blog/ask_new_post.sh"], env=env, check=True)
                 send_message(chat_id, "Post creato e sito rigenerato con successo!")
+                
+                # Costruisci il link al nuovo post.
+                # Assumiamo che il link sia composto da BLOG_BASE_URL/<keywords>
+                new_post_link = BLOG_BASE_URL + "/" + data["keywords"]
+                message_for_channel = f"Nuovo post: {data['title']}\nLeggi l'articolo completo qui: {new_post_link}"
+                send_message(REPOST_CHANNEL_ID, message_for_channel)
             except subprocess.CalledProcessError as e:
                 send_message(chat_id, f"Si è verificato un errore durante la creazione del post: {e}")
             # Termina la conversazione
