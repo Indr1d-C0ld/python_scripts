@@ -67,9 +67,9 @@ def process_search(chat_id, keywords_text):
     # ------------------------------------------------------------------------------
     # 1) COSTRUZIONE DELLA PIPELINE DI RIPGREP PER RICERCA “AND” (case-insensitive)
     # ------------------------------------------------------------------------------
-    command = f'rg --color=never -i "{keywords[0]}" "{FILE_NAME}"'
+    command = f'rg -a -uu --no-config --no-mmap --color=never -i "{keywords[0]}" "{FILE_NAME}"'
     for kw in keywords[1:]:
-        command += f' | rg --color=never -i "{kw}"'
+        command += f' | rg -a -uu --no-config --no-mmap --color=never -i "{kw}"'
 
     # ------------------------------------------------------------------------------
     # 2) SCRIPT AWK PER FORMATTARE L'OUTPUT SENZA COLORAZIONE
